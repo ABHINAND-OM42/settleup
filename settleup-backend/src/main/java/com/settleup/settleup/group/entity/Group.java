@@ -37,4 +37,11 @@ public class Group {
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private Set<User> members = new HashSet<>();
+
+    // ... existing imports
+
+    // ADD THIS FIELD
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_user_id") // New Column
+    private User createdBy;
 }

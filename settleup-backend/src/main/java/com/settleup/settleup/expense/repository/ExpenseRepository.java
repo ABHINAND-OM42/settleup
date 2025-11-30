@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     List<Expense> findByGroupId(Long groupId);
+    boolean existsByGroupIdAndPaidById(Long groupId, Long userId);
 }

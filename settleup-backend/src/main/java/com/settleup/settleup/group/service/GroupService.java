@@ -1,5 +1,9 @@
 package com.settleup.settleup.group.service;
 
+import com.settleup.settleup.exception.InvalidInputException;
+import com.settleup.settleup.exception.ResourceNotFoundException;
+import com.settleup.settleup.expense.repository.ExpenseRepository;
+import com.settleup.settleup.expense.repository.ExpenseSplitRepository;
 import com.settleup.settleup.group.dto.GroupCreateDto;
 import com.settleup.settleup.group.dto.GroupResponseDto;
 import com.settleup.settleup.group.entity.Group;
@@ -7,7 +11,6 @@ import com.settleup.settleup.group.repository.GroupRepository;
 import com.settleup.settleup.user.dto.UserResponseDto;
 import com.settleup.settleup.user.entity.User;
 import com.settleup.settleup.user.repository.UserRepository;
-import com.settleup.settleup.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,60 +25,106 @@ public class GroupService {
 
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
+    private final ExpenseRepository expenseRepo;
+    private final ExpenseSplitRepository splitRepo;
 
-    // CREATE GROUP
+    // 1. CREATE GROUP
     public GroupResponseDto createGroup(GroupCreateDto dto) {
+        // Fetch Creator
+        User creator = userRepository.findById(dto.getCreatedByUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Creator not found"));
 
-        // 1. Fetch all members from DB
+        // Fetch Members
         List<User> members = userRepository.findAllById(dto.getMemberIds());
 
-        // --- NEW STRICT VALIDATION START ---
-        // If the number of found users is less than the requested IDs, something is missing.
+        // --- STRICT VALIDATION: Ensure all requested IDs exist ---
         if (members.size() != dto.getMemberIds().size()) {
-
-            // Get list of found IDs
-            List<Long> foundIds = members.stream()
-                    .map(User::getId)
-                    .collect(Collectors.toList());
-
-            // Find which IDs from the input are NOT in the found list
+            List<Long> foundIds = members.stream().map(User::getId).collect(Collectors.toList());
             List<Long> missingIds = dto.getMemberIds().stream()
                     .filter(id -> !foundIds.contains(id))
                     .collect(Collectors.toList());
-
             throw new ResourceNotFoundException("Users not found with IDs: " + missingIds);
         }
-        // --- NEW STRICT VALIDATION END ---
+        // ---------------------------------------------------------
 
-        // 2. Create and Save Group
         Group group = Group.builder()
                 .name(dto.getName())
                 .description(dto.getDescription())
                 .members(new HashSet<>(members))
+                .createdBy(creator)
                 .build();
 
         Group savedGroup = groupRepository.save(group);
-
         return mapToResponse(savedGroup);
     }
 
-    // GET GROUP BY ID
+    // 2. GET GROUP BY ID
     public GroupResponseDto getGroup(Long groupId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new ResourceNotFoundException("Group not found with ID: " + groupId));
-
         return mapToResponse(group);
     }
 
-    // GET ALL GROUPS FOR A USER (For Dashboard)
+    // 3. GET USER GROUPS
     public List<GroupResponseDto> getUserGroups(Long userId) {
         List<Group> groups = groupRepository.findByMembers_Id(userId);
         return groups.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
-    // HELPER: Map Entity to DTO
+    // 4. ADD MEMBER
+    public GroupResponseDto addMember(Long groupId, Long userId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (group.getMembers().contains(user)) {
+            throw new InvalidInputException("User is already in the group");
+        }
+
+        group.getMembers().add(user);
+        Group savedGroup = groupRepository.save(group);
+        return mapToResponse(savedGroup);
+    }
+
+    // 5. REMOVE MEMBER
+    public GroupResponseDto removeMember(Long groupId, Long userId, Long requesterId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
+
+        // Permission Check: Only Creator
+        if (!group.getCreatedBy().getId().equals(requesterId)) {
+            throw new InvalidInputException("Only the Group Admin can remove members.");
+        }
+
+        // Safety: Admin cannot remove self
+        if (userId.equals(group.getCreatedBy().getId())) {
+            throw new InvalidInputException("Admin cannot be removed from the group.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!group.getMembers().contains(user)) {
+            throw new ResourceNotFoundException("User is not in this group");
+        }
+
+        // Logic Check: Active Expenses
+        boolean hasPaidExpenses = expenseRepo.existsByGroupIdAndPaidById(groupId, userId);
+        boolean hasSplits = splitRepo.existsByExpense_GroupIdAndUserId(groupId, userId);
+
+        if (hasPaidExpenses || hasSplits) {
+            throw new InvalidInputException("Cannot remove user. They are part of expenses/splits.");
+        }
+
+        group.getMembers().remove(user);
+        Group savedGroup = groupRepository.save(group);
+        return mapToResponse(savedGroup);
+    }
+
+    // HELPER
     private GroupResponseDto mapToResponse(Group group) {
-        // Convert User entities to UserResponseDto
         List<UserResponseDto> memberDtos = group.getMembers().stream()
                 .map(user -> new UserResponseDto(
                         user.getId(),
@@ -90,6 +139,7 @@ public class GroupService {
                 .description(group.getDescription())
                 .createdAt(group.getCreatedAt())
                 .members(memberDtos)
+                .createdByUserId(group.getCreatedBy().getId())
                 .build();
     }
 }

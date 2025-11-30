@@ -14,4 +14,8 @@ public class GroupResponseDto {
     private String description;
     private LocalDateTime createdAt;
     private List<UserResponseDto> members; // Full member details
+    // ... existing fields
+
+    // ADD THIS
+    private Long createdByUserId;
 }

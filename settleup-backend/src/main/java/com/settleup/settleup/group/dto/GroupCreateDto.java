@@ -2,6 +2,7 @@ package com.settleup.settleup.group.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.util.List;
 
@@ -15,4 +16,9 @@ public class GroupCreateDto {
 
     @NotEmpty(message = "Group must have at least one member")
     private List<Long> memberIds; // We send User IDs [1, 2, 5]
+
+
+    // --- MAKE SURE THIS IS HERE ---
+    @NotNull(message = "Creator ID is required")
+    private Long createdByUserId;
 }

@@ -40,4 +40,25 @@ public class GroupController {
         List<GroupResponseDto> response = groupService.getUserGroups(userId);
         return ResponseEntity.ok(ApiResponse.success(response, "User groups fetched"));
     }
+
+    //ADD MEMBER
+    @PostMapping("/{groupId}/members/{userId}")
+    public ResponseEntity<ApiResponse<GroupResponseDto>> addMember(
+            @PathVariable Long groupId,
+            @PathVariable Long userId) {
+
+        GroupResponseDto response = groupService.addMember(groupId, userId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Member added successfully"));
+    }
+
+    // Update REMOVE to accept requesterId
+    @DeleteMapping("/{groupId}/members/{userId}")
+    public ResponseEntity<ApiResponse<GroupResponseDto>> removeMember(
+            @PathVariable Long groupId,
+            @PathVariable Long userId,
+            @RequestParam Long requesterId) { // <--- Receive who is clicking the button
+
+        GroupResponseDto response = groupService.removeMember(groupId, userId, requesterId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Member removed successfully"));
+    }
 }
