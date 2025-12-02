@@ -61,4 +61,13 @@ public class GroupController {
         GroupResponseDto response = groupService.removeMember(groupId, userId, requesterId);
         return ResponseEntity.ok(ApiResponse.success(response, "Member removed successfully"));
     }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<ApiResponse<Void>> deleteGroup(
+            @PathVariable Long groupId,
+            @RequestParam Long requesterId // Send who is asking
+    ) {
+        groupService.deleteGroup(groupId, requesterId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Group deleted successfully"));
+    }
 }

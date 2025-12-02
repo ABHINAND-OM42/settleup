@@ -1,29 +1,31 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
 
 const GroupView = () => {
   const { groupId } = useParams();
+  const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
-  // --- STATE ---
+  // --- STATE MANAGEMENT ---
   const [group, setGroup] = useState(null);
   const [history, setHistory] = useState([]);
   const [balances, setBalances] = useState({ balances: [], simplifiedDebts: [] });
   const [loading, setLoading] = useState(true);
   
+  // UI State
   const [expandedId, setExpandedId] = useState(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Personal Status
+  // Personal Status State
   const [myBalance, setMyBalance] = useState(0);
   const [iOwe, setIOwe] = useState([]);      
   const [owedToMe, setOwedToMe] = useState([]); 
 
-  // --- FETCH DATA ---
+  // --- INITIAL DATA FETCH ---
   useEffect(() => {
     fetchData();
   }, [groupId]);
@@ -31,16 +33,21 @@ const GroupView = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      
+      // 1. Get Group Details
       const groupRes = await api.get(`/groups/${groupId}`);
       setGroup(groupRes.data.data);
 
+      // 2. Get Activity History
       const historyRes = await api.get(`/expenses/group/${groupId}/history`);
       setHistory(historyRes.data.data);
 
+      // 3. Get Balances
       const balanceRes = await api.get(`/expenses/group/${groupId}/balances`);
       const balanceData = balanceRes.data.data;
       setBalances(balanceData);
 
+      // 4. Calculate Personal Status (What do *I* owe?)
       if (currentUser && balanceData) {
         const myEntry = balanceData.balances.find(b => b.userId === currentUser.id);
         const myName = myEntry ? myEntry.name : currentUser.name;
@@ -49,6 +56,7 @@ const GroupView = () => {
         setIOwe(balanceData.simplifiedDebts.filter(d => d.fromUser === myName));
         setOwedToMe(balanceData.simplifiedDebts.filter(d => d.toUser === myName));
       }
+
     } catch (error) {
       console.error(error);
       toast.error("Failed to load group details");
@@ -57,7 +65,9 @@ const GroupView = () => {
     }
   };
 
-  // --- HANDLERS (Search, Add, Remove, Expand) ---
+  // --- HANDLERS ---
+
+  // Search Logic (Debounced)
   useEffect(() => {
     if (!showAddMember || searchQuery.trim().length === 0) {
         setSearchResults([]);
@@ -84,41 +94,78 @@ const GroupView = () => {
           toast.success("Member added!");
           setSearchQuery('');
           setShowAddMember(false);
-          fetchData();
+          fetchData(); 
       } catch (error) {
           toast.error(error.response?.data?.message || "Failed to add member");
       }
   };
 
   const handleRemoveMember = async (userId) => {
-      if(!window.confirm("Are you sure? Only users with NO active expenses can be removed.")) return;
+      // Clear warning before removing
+      const confirmMsg = "Are you sure you want to remove this member?\n\n" +
+        "• Their past expenses will remain in history.\n" +
+        "• If they currently owe money, you should SETTLE UP first.";
+
+      if(!window.confirm(confirmMsg)) return;
+      
       try {
           await api.delete(`/groups/${groupId}/members/${userId}?requesterId=${currentUser.id}`);
           toast.success("Member removed successfully");
-          fetchData();
+          fetchData(); 
       } catch (error) {
-          toast.error(error.response?.data?.message || "Failed to remove member");
+          const msg = error.response?.data?.message || "Failed to remove member";
+          toast.error(msg);
       }
   };
 
   const handleDeleteItem = async (e, type, id) => {
-    e.stopPropagation();
-    if(!window.confirm(`Delete this ${type.toLowerCase()}? Balances will be updated.`)) return;
+    e.stopPropagation(); // Stop expanding the accordion
+    if(!window.confirm(`Delete this ${type.toLowerCase()}? Balances will be recalculated.`)) return;
+
     try {
-        await api.delete(type === 'EXPENSE' ? `/expenses/${id}` : `/settlements/${id}`);
+        if (type === 'EXPENSE') {
+            await api.delete(`/expenses/${id}`);
+        } else {
+            await api.delete(`/settlements/${id}`);
+        }
         toast.success("Deleted successfully");
-        fetchData();
+        fetchData(); 
     } catch (error) {
         toast.error("Failed to delete item");
     }
   };
 
+  const handleDeleteGroup = async () => {
+    // 1. Client-side Pre-check (Optional, Backend does strict check too)
+    if (balances.simplifiedDebts.length > 0) {
+        toast.error("Cannot delete group: There are unpaid debts. Please Settle Up everyone first.");
+        return;
+    }
+
+    const confirmMsg =
+        "Are you sure you want to PERMANENTLY DELETE this group?\n" +
+        "All expenses, history, and records will be lost forever.";
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+        // Call Backend Delete
+        await api.delete(`/groups/${groupId}?requesterId=${currentUser.id}`);
+        toast.success("Group deleted successfully");
+        navigate('/dashboard'); 
+    } catch (error) {
+        console.error("Delete Error:", error.response);
+        toast.error(error.response?.data?.message || "Failed to delete group");
+    }
+  };
+
+  // --- SORTING ---
   const isSettled = balances.simplifiedDebts.length === 0;
 
-  // --- SORT MEMBERS (Admin First) ---
+  // Sort Members: Admin always on top
   const sortedMembers = group?.members ? [...group.members].sort((a, b) => {
-      if (a.id === group.createdByUserId) return -1;
-      if (b.id === group.createdByUserId) return 1;
+      if (a.id == group.createdByUserId) return -1;
+      if (b.id == group.createdByUserId) return 1;
       return 0;
   }) : [];
 
@@ -143,15 +190,28 @@ const GroupView = () => {
                         </span>
                     )}
                 </div>
-                <p className="text-muted mb-0"><small>{group?.description || ''}</small></p>
+                <p className="text-muted mb-0"><small>{group?.description || 'No description'}</small></p>
             </div>
             
-            <div className="mt-3 mt-md-0 d-flex gap-2">
+            <div className="mt-3 mt-md-0 d-flex gap-2 align-items-center">
+                
+                {/* DELETE GROUP BUTTON (Admin Only) */}
+                {group?.createdByUserId == currentUser.id && (
+                    <button 
+                        className="btn btn-outline-danger px-3 rounded-pill me-2"
+                        onClick={handleDeleteGroup}
+                        title="Delete Group"
+                    >
+                        <i className="bi bi-trash3-fill"></i>Delete Group
+                    </button>
+                )}
+
                 <Link to={`/groups/${groupId}/add-expense`} className="btn btn-primary px-4 rounded-pill shadow-sm">
                     <i className="bi bi-plus-lg me-1"></i> Add Expense
                 </Link>
+                
                 {isSettled ? (
-                    <button className="btn btn-secondary px-4 rounded-pill disabled opacity-50">Settle Up</button>
+                    <button className="btn btn-secondary px-4 rounded-pill disabled opacity-50" title="Nothing to settle">Settle Up</button>
                 ) : (
                     <Link to={`/groups/${groupId}/settle`} className="btn btn-outline-success px-4 rounded-pill">
                         Settle Up
@@ -172,7 +232,6 @@ const GroupView = () => {
                 <div className="d-flex justify-content-between align-items-center">
                     <span><i className="bi bi-wallet2 me-2"></i> Your Status</span>
                     <span className="fs-5">
-                        {/* CHANGED TO RUPEE */}
                         {myBalance >= 0 ? `You get back ₹${myBalance.toFixed(2)}` : `You owe ₹${Math.abs(myBalance).toFixed(2)}`}
                     </span>
                 </div>
@@ -192,7 +251,6 @@ const GroupView = () => {
                                             <div className="bg-danger-subtle text-danger rounded-circle p-2 me-2" style={{width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center'}}><i className="bi bi-person"></i></div>
                                             <span className="fw-medium">{d.toUser}</span>
                                         </div>
-                                        {/* CHANGED TO RUPEE */}
                                         <span className="text-danger fw-bold">₹{d.amount}</span>
                                     </li>
                                 ))}
@@ -212,7 +270,6 @@ const GroupView = () => {
                                             <div className="bg-success-subtle text-success rounded-circle p-2 me-2" style={{width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center'}}><i className="bi bi-person"></i></div>
                                             <span className="fw-medium">{d.fromUser}</span>
                                         </div>
-                                        {/* CHANGED TO RUPEE */}
                                         <span className="text-success fw-bold">₹{d.amount}</span>
                                     </li>
                                 ))}
@@ -260,14 +317,13 @@ const GroupView = () => {
                             <div>
                                 <h6 className="mb-0 fw-bold text-dark">{item.description}</h6>
                                 <small className="text-muted">
-                                    {/* UPDATED SUB-TEXT: Shows amount paid in Rupee */}
+                                    {/* ACTIVITY DETAILS */}
                                     {item.paidByUserName} {item.type === 'SETTLEMENT' ? `paid ₹${item.amount}` : 'added'} on {new Date(item.createdAt).toLocaleDateString()}
                                 </small>
                             </div>
                         </div>
 
                         <div className="text-end">
-                            {/* CHANGED TO RUPEE */}
                             <div className={`fs-5 fw-bold ${item.type === 'SETTLEMENT' ? 'text-success' : 'text-danger'}`}>
                                 {item.type === 'SETTLEMENT' ? 'PAID' : `₹${item.amount}`}
                             </div>
@@ -278,6 +334,8 @@ const GroupView = () => {
                                         {expandedId === item.id ? 'Hide Details' : 'View Split'}
                                     </small>
                                 )}
+                                
+                                {/* DELETE ITEM BUTTON */}
                                 <button 
                                     className="btn btn-link text-muted p-0 text-decoration-none" 
                                     style={{fontSize: '0.75rem'}}
@@ -289,7 +347,7 @@ const GroupView = () => {
                         </div>
                     </div>
 
-                    {/* Collapsible Details */}
+                    {/* Collapsible Details (Expenses only) */}
                     {expandedId === item.id && item.type === 'EXPENSE' && (
                         <div className="bg-light p-3 border-top" style={{fontSize: '0.9rem'}}>
                             <h6 className="text-muted text-uppercase small fw-bold mb-2">Split Breakdown</h6>
@@ -298,7 +356,6 @@ const GroupView = () => {
                                     <div key={idx} className="col-md-6">
                                         <div className="d-flex justify-content-between align-items-center bg-white border rounded px-3 py-2">
                                             <span className="fw-medium">{split.userName}</span>
-                                            {/* CHANGED TO RUPEE */}
                                             <span className="text-danger fw-bold">owes ₹{split.amountOwed.toFixed(2)}</span>
                                         </div>
                                     </div>
@@ -353,7 +410,7 @@ const GroupView = () => {
 
             <ul className="list-group list-group-flush">
                 {sortedMembers.map(m => {
-                    // Check Logic for Remove Button
+                    // Permission Check
                     const isAdmin = group.createdByUserId == currentUser.id;
                     const isNotMe = m.id != currentUser.id;
 
@@ -376,6 +433,7 @@ const GroupView = () => {
                             </div>
                         </div>
                         
+                        {/* Remove Button - Only visible if I am Admin AND target is not me */}
                         {isAdmin && isNotMe && (
                             <button 
                                 className="btn btn-outline-danger btn-sm px-3 shadow-sm py-0" 
@@ -400,7 +458,6 @@ const GroupView = () => {
                 {balances.balances.map((user) => (
                   <li key={user.userId} className={`list-group-item d-flex justify-content-between align-items-center py-3 ${user.userId === currentUser.id ? 'bg-primary-subtle border-start border-4 border-primary' : ''}`}>
                       <span className="fw-medium">{user.userId === currentUser.id ? 'You' : user.name}</span>
-                      {/* CHANGED TO RUPEE */}
                       <span className={`fw-bold ${user.amount >= 0 ? 'text-success' : 'text-danger'}`}>
                           {user.amount >= 0 ? `+₹${user.amount.toFixed(2)}` : `₹${user.amount.toFixed(2)}`}
                       </span>
