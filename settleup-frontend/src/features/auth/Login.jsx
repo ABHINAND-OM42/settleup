@@ -55,6 +55,9 @@ const Login = () => {
         </form>
 
         <div className="text-center mt-3">
+          <div className="mb-2">
+            <Link to="/forgot-password" className="text-danger text-decoration-none small">Forgot Password?</Link>
+          </div>
           <small>New here? <Link to="/register">Create an account</Link></small>
         </div>
       </div>

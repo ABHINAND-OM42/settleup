@@ -1,5 +1,6 @@
 package com.settleup.settleup.user.controller;
 
+import com.settleup.settleup.user.dto.PasswordResetDto;
 import com.settleup.settleup.user.dto.UserRegisterDto;
 import com.settleup.settleup.user.dto.UserLoginDto;
 import com.settleup.settleup.user.dto.UserResponseDto;
@@ -33,16 +34,10 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(response, "Login successful"));
     }
 
-//    @GetMapping
-//    public ResponseEntity<ApiResponse<java.util.List<UserResponseDto>>> getAllUsers() {
-//        return ResponseEntity.ok(ApiResponse.success(userService.getAllUsers(), "Users fetched"));
-//    }
-
     @GetMapping
     public ResponseEntity<ApiResponse<List<UserResponseDto>>> getUsers(
-            @RequestParam(required = false) String query) { // <--- Optional Query
+            @RequestParam(required = false) String query) {
 
-        // The service logic handles if 'query' is null or has text
         List<UserResponseDto> users = userService.searchUsers(query);
         return ResponseEntity.ok(ApiResponse.success(users, "Users fetched successfully"));
     }
@@ -54,5 +49,11 @@ public class UserController {
 
         UserResponseDto response = userService.updateUser(userId, dto);
         return ResponseEntity.ok(ApiResponse.success(response, "Profile updated successfully"));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody PasswordResetDto dto) {
+        userService.resetPassword(dto);
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
     }
 }

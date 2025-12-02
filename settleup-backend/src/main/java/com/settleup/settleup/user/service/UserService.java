@@ -2,6 +2,7 @@ package com.settleup.settleup.user.service;
 
 import com.settleup.settleup.exception.InvalidInputException;
 import com.settleup.settleup.exception.ResourceNotFoundException;
+import com.settleup.settleup.user.dto.PasswordResetDto;
 import com.settleup.settleup.user.dto.UserLoginDto;
 import com.settleup.settleup.user.dto.UserRegisterDto;
 import com.settleup.settleup.user.dto.UserResponseDto;
@@ -21,7 +22,6 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    // DIRECT INSTANTIATION (As requested)
     // We make it 'final' so it's immutable, but initialized immediately so Lombok ignores it in constructor
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -118,6 +118,23 @@ public class UserService {
                 user.getEmail(),
                 user.getMobileNumber()
         );
+    }
+
+    // UPDATED FORGOT PASSWORD LOGIC
+    public void resetPassword(PasswordResetDto dto) {
+        // 1. Validate Passwords Match
+        if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
+            throw new InvalidInputException("New Password and Confirm Password do not match.");
+        }
+
+        // 2. Verify Identity
+        User user = userRepository.findByEmailAndMobileNumber(dto.getEmail(), dto.getMobileNumber())
+                .orElseThrow(() -> new InvalidInputException("No account found with this Email and Mobile number."));
+
+        // 3. Update Password
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+
+        userRepository.save(user);
     }
 
 

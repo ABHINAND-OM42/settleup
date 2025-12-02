@@ -14,12 +14,12 @@ const GroupView = () => {
   const [loading, setLoading] = useState(true);
   
   // UI State
-  const [expandedId, setExpandedId] = useState(null); // Tracks which expense details are open
-  const [showAddMember, setShowAddMember] = useState(false); // Toggles the search input
+  const [expandedId, setExpandedId] = useState(null);
+  const [showAddMember, setShowAddMember] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Personalization State (My Status)
+  // Personalization State
   const [myBalance, setMyBalance] = useState(0);
   const [iOwe, setIOwe] = useState([]);      
   const [owedToMe, setOwedToMe] = useState([]); 
@@ -33,27 +33,21 @@ const GroupView = () => {
     try {
       setLoading(true);
       
-      // 1. Get Group Details
       const groupRes = await api.get(`/groups/${groupId}`);
       setGroup(groupRes.data.data);
 
-      // 2. Get Activity History
       const historyRes = await api.get(`/expenses/group/${groupId}/history`);
       setHistory(historyRes.data.data);
 
-      // 3. Get Balances
       const balanceRes = await api.get(`/expenses/group/${groupId}/balances`);
       const balanceData = balanceRes.data.data;
       setBalances(balanceData);
 
-      // 4. Calculate Personal Status
       if (currentUser && balanceData) {
         const myEntry = balanceData.balances.find(b => b.userId === currentUser.id);
         const myName = myEntry ? myEntry.name : currentUser.name;
         
         setMyBalance(myEntry ? myEntry.amount : 0);
-        
-        // Filter simplified debts to find mine
         setIOwe(balanceData.simplifiedDebts.filter(d => d.fromUser === myName));
         setOwedToMe(balanceData.simplifiedDebts.filter(d => d.toUser === myName));
       }
@@ -66,7 +60,7 @@ const GroupView = () => {
     }
   };
 
-  // --- MEMBER SEARCH LOGIC (Debounced) ---
+  // --- MEMBER SEARCH LOGIC ---
   useEffect(() => {
     if (!showAddMember || searchQuery.trim().length === 0) {
         setSearchResults([]);
@@ -76,13 +70,12 @@ const GroupView = () => {
         try {
             const response = await api.get(`/users?query=${searchQuery}`);
             if(response.data.success) {
-                // Filter out users who are already in the group
                 const currentMemberIds = group?.members.map(m => m.id) || [];
                 const filtered = response.data.data.filter(u => !currentMemberIds.includes(u.id));
                 setSearchResults(filtered);
             }
         } catch(err) { console.error(err); }
-    }, 300); 
+    }, 300);
     return () => clearTimeout(timeoutId);
   }, [searchQuery, showAddMember, group]);
 
@@ -108,7 +101,6 @@ const GroupView = () => {
       if(!window.confirm("Are you sure? Only users with NO active expenses can be removed.")) return;
       
       try {
-          // Pass requesterId so backend knows WE (the Admin) are asking
           await api.delete(`/groups/${groupId}/members/${userId}?requesterId=${currentUser.id}`);
           toast.success("Member removed successfully");
           fetchData(); 
@@ -118,7 +110,17 @@ const GroupView = () => {
       }
   };
 
-  // Helper to check settlement status
+  // --- SORTING LOGIC: ADMIN FIRST ---
+  // Create a copy of members and sort it so Admin is always index 0
+  const sortedMembers = group?.members ? [...group.members].sort((a, b) => {
+      // If a is admin, put a first (-1)
+      if (a.id === group.createdByUserId) return -1;
+      // If b is admin, put b first (1)
+      if (b.id === group.createdByUserId) return 1;
+      // Otherwise keep original order
+      return 0;
+  }) : [];
+
   const isSettled = balances.simplifiedDebts.length === 0;
 
   if (loading) return <div className="text-center mt-5"><div className="spinner-border text-primary"></div><p>Loading Group...</p></div>;
@@ -131,8 +133,6 @@ const GroupView = () => {
         <div>
           <div className="d-flex align-items-center gap-3">
             <h2 className="mb-0 fw-bold text-primary">{group?.name}</h2>
-            
-            {/* Status Badge */}
             {isSettled ? (
                 <span className="badge bg-success rounded-pill px-3">
                     <i className="bi bi-check-circle-fill me-1"></i> All Settled
@@ -151,7 +151,6 @@ const GroupView = () => {
             <i className="bi bi-receipt me-1"></i> Add Expense
           </Link>
           
-          {/* Disable Settle Up if there are no debts */}
           {isSettled ? (
              <button className="btn btn-success disabled" title="Nothing to settle">
                 <i className="bi bi-check-lg me-1"></i> Settle Up
@@ -169,7 +168,6 @@ const GroupView = () => {
         {/* --- LEFT COLUMN: ACTIVITY & PERSONAL STATUS --- */}
         <div className="col-md-8">
           
-          {/* Personal Alert Box */}
           <div className={`alert ${myBalance >= 0 ? 'alert-success' : 'alert-danger'} shadow-sm mb-4`}>
             <h4 className="alert-heading fw-bold">
               {myBalance >= 0 ? `You are owed $${myBalance.toFixed(2)}` : `You owe $${Math.abs(myBalance).toFixed(2)}`}
@@ -195,7 +193,6 @@ const GroupView = () => {
             </div>
           </div>
 
-          {/* Activity Feed */}
           <h4 className="mb-3">Activity</h4>
           {history.length === 0 ? (
             <div className="alert alert-secondary text-center p-5">
@@ -207,7 +204,6 @@ const GroupView = () => {
               {history.map((item) => (
                 <div key={`${item.type}-${item.id}`} className="list-group-item p-0" style={{cursor: 'pointer'}} onClick={() => toggleExpand(item.id)}>
                   
-                  {/* Summary Row */}
                   <div className="d-flex justify-content-between align-items-center p-3">
                     <div className="d-flex align-items-center">
                       <div className={`rounded-circle p-2 me-3 text-white ${item.type === 'SETTLEMENT' ? 'bg-success' : 'bg-secondary'}`} 
@@ -233,7 +229,6 @@ const GroupView = () => {
                     </div>
                   </div>
 
-                  {/* Expanded Details */}
                   {expandedId === item.id && item.type === 'EXPENSE' && (
                     <div className="bg-light border-top p-3">
                        <h6 className="fw-bold text-muted small text-uppercase mb-2">Split Details</h6>
@@ -291,11 +286,13 @@ const GroupView = () => {
             )}
 
             <ul className="list-group list-group-flush">
-                {group?.members.map(m => (
+                {/* USE sortedMembers HERE INSTEAD OF group.members */}
+                {sortedMembers.map(m => (
                     <li key={m.id} className="list-group-item d-flex justify-content-between align-items-center py-3">
                         <div>
                             <div>
                                 <span className="fw-bold">{m.id === currentUser.id ? 'You' : m.name}</span>
+                                {/* ADMIN BADGE */}
                                 {m.id === group.createdByUserId && (
                                     <span className="badge bg-secondary ms-2" style={{fontSize: '0.6rem'}}>ADMIN</span>
                                 )}
@@ -303,7 +300,7 @@ const GroupView = () => {
                             <div className="text-muted small" style={{fontSize: '0.75rem'}}>{m.email}</div>
                         </div>
                         
-                        {/* REMOVE BUTTON: Only show if I am Admin AND Target is not Me */}
+                        {/* Remove Button */}
                         {currentUser.id === group.createdByUserId && m.id !== currentUser.id && (
                             <button 
                                 className="btn btn-outline-danger btn-sm px-3" 

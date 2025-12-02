@@ -15,7 +15,7 @@ public class GroupCreateDto {
     private String description;
 
     @NotEmpty(message = "Group must have at least one member")
-    private List<Long> memberIds; // We send User IDs [1, 2, 5]
+    private List<Long> memberIds;
 
 
     // --- MAKE SURE THIS IS HERE ---

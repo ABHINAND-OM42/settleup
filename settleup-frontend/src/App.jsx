@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 
 import Login from './features/auth/Login';
 import Register from './features/auth/Register';
+import ForgotPassword from './features/auth/ForgotPassword';
 import AccountSettings from './features/auth/AccountSettings';
 import Dashboard from './features/dashboard/Dashboard';
 import CreateGroup from './features/groups/CreateGroup';
@@ -26,6 +27,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/groups/create" element={<PrivateRoute><CreateGroup /></PrivateRoute>} />
           <Route path="/groups/:groupId" element={<PrivateRoute><GroupView /></PrivateRoute>} />
