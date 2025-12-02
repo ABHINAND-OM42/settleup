@@ -18,7 +18,7 @@ const AddExpense = () => {
     splitType: 'EQUAL'
   });
 
-  // State for EXACT split amounts: { userId: amount } -> { 1: 200, 2: 300 }
+  // Exact Split State
   const [exactAmounts, setExactAmounts] = useState({});
 
   useEffect(() => {
@@ -28,12 +28,10 @@ const AddExpense = () => {
         const mems = response.data.data.members;
         setMembers(mems);
         
-        // Default Payer
         if (mems.length > 0) {
            setFormData(prev => ({ ...prev, paidByUserId: mems[0].id }));
         }
         
-        // Initialize exact amounts to 0 for everyone
         const initialAmounts = {};
         mems.forEach(m => initialAmounts[m.id] = '');
         setExactAmounts(initialAmounts);
@@ -47,67 +45,66 @@ const AddExpense = () => {
     fetchGroup();
   }, [groupId]);
 
-  // Handle changes for Exact Amount inputs
   const handleExactAmountChange = (userId, value) => {
-    setExactAmounts(prev => ({
-      ...prev,
-      [userId]: value
-    }));
+    setExactAmounts(prev => ({ ...prev, [userId]: value }));
   };
+
+  // Math Helpers
+  const getCurrentSplitSum = () => {
+    return Object.values(exactAmounts).reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
+  };
+  const getTotalAmount = () => parseFloat(formData.amount) || 0;
+  const getRemaining = () => getTotalAmount() - getCurrentSplitSum();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const totalAmount = getTotalAmount();
 
-    const totalAmount = parseFloat(formData.amount);
+    if (totalAmount <= 0) {
+        toast.error("Please enter a valid amount");
+        return;
+    }
 
-    // 1. Validate EXACT Logic
+    // Exact Split Validation
     if (formData.splitType === 'EXACT') {
-      let currentSum = 0;
-      const splitMap = {};
-
-      // Sum up inputs
-      members.forEach(member => {
-        const val = parseFloat(exactAmounts[member.id] || 0);
-        currentSum += val;
-        splitMap[member.id] = val;
-      });
-
-      // Check if sum matches total (allow small float diff)
+      const currentSum = getCurrentSplitSum();
+      
       if (Math.abs(totalAmount - currentSum) > 0.01) {
-        toast.error(`Split amounts (${currentSum}) do not equal Total (${totalAmount})`);
+        toast.error(`Amounts sum to ₹${currentSum}, but Total is ₹${totalAmount}`);
         return;
       }
 
-      // 2. Prepare Payload for EXACT
+      const splitMap = {};
+      members.forEach(member => {
+        splitMap[member.id] = parseFloat(exactAmounts[member.id] || 0);
+      });
+
       try {
-        const payload = {
+        await sendRequest({
           groupId: parseInt(groupId),
           paidByUserId: parseInt(formData.paidByUserId),
           description: formData.description,
           amount: totalAmount,
           splitType: 'EXACT',
-          exactSplits: splitMap // Send the map
-        };
-        await sendRequest(payload);
+          exactSplits: splitMap
+        });
       } catch (err) { return; }
 
     } else {
-      // 3. Prepare Payload for EQUAL
+      // Equal Split
       try {
-        const payload = {
+        await sendRequest({
           groupId: parseInt(groupId),
           paidByUserId: parseInt(formData.paidByUserId),
           description: formData.description,
           amount: totalAmount,
           splitType: 'EQUAL',
           involvedUserIds: members.map(m => m.id)
-        };
-        await sendRequest(payload);
+        });
       } catch (err) { return; }
     }
   };
 
-  // Helper to send API call
   const sendRequest = async (payload) => {
     try {
       const response = await api.post('/expenses', payload);
@@ -120,120 +117,133 @@ const AddExpense = () => {
     }
   };
 
-  // Helper to calculate current sum for display
-  const getCurrentSplitSum = () => {
-    return Object.values(exactAmounts).reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
-  };
-
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="text-center mt-5">Loading...</div>;
 
   return (
-    <div className="card shadow-sm mx-auto" style={{ maxWidth: '600px' }}>
-      <div className="card-body p-4">
-        <h3 className="mb-4 text-danger">Add New Expense</h3>
-        
-        <form onSubmit={handleSubmit}>
-          {/* Description */}
-          <div className="mb-3">
-            <label className="form-label">Description</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              placeholder="e.g. Dinner at Taj"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              required
-            />
-          </div>
-
-          {/* Total Amount */}
-          <div className="mb-3">
-            <label className="form-label">Total Amount</label>
-            <input 
-              type="number" 
-              className="form-control" 
-              placeholder="0.00"
-              value={formData.amount}
-              onChange={(e) => setFormData({...formData, amount: e.target.value})}
-              required
-            />
-          </div>
-
-          {/* Paid By */}
-          <div className="mb-3">
-            <label className="form-label">Paid By</label>
-            <select 
-              className="form-select"
-              value={formData.paidByUserId}
-              onChange={(e) => setFormData({...formData, paidByUserId: e.target.value})}
-            >
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Split Type Selector */}
-          <div className="mb-3">
-            <label className="form-label">Split Type</label>
-            <select 
-              className="form-select" 
-              value={formData.splitType}
-              onChange={(e) => setFormData({...formData, splitType: e.target.value})}
-            >
-              <option value="EQUAL">Split Equally</option>
-              <option value="EXACT">Split by Exact Amounts</option>
-            </select>
-          </div>
-
-          <hr />
-
-          {/* CONDITIONAL UI: EQUAL SPLIT */}
-          {formData.splitType === 'EQUAL' && (
-             <div className="alert alert-light border small text-muted text-center">
-                Total will be divided by {members.length}. <br/>
-                Each person owes: <strong>${(formData.amount / members.length || 0).toFixed(2)}</strong>
-             </div>
-          )}
-
-          {/* CONDITIONAL UI: EXACT SPLIT */}
-          {formData.splitType === 'EXACT' && (
-            <div className="mb-4 bg-light p-3 rounded">
-              <label className="form-label fw-bold mb-3">Enter Shares:</label>
-              
-              {members.map(member => (
-                <div key={member.id} className="mb-2 row align-items-center">
-                  <div className="col-4 text-truncate">{member.name}</div>
-                  <div className="col-8">
-                    <div className="input-group input-group-sm">
-                      <span className="input-group-text">$</span>
-                      <input 
-                        type="number" 
-                        className="form-control"
-                        placeholder="0.00"
-                        value={exactAmounts[member.id]}
-                        onChange={(e) => handleExactAmountChange(member.id, e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Math Helper */}
-              <div className="d-flex justify-content-between mt-3 pt-2 border-top">
-                <span>Total Entered:</span>
-                <span className={Math.abs(parseFloat(formData.amount) - getCurrentSplitSum()) > 0.01 ? 'text-danger fw-bold' : 'text-success fw-bold'}>
-                  ${getCurrentSplitSum().toFixed(2)} / ${formData.amount || 0}
-                </span>
-              </div>
-              {Math.abs(parseFloat(formData.amount) - getCurrentSplitSum()) > 0.01 && (
-                  <div className="text-danger small text-end">Amounts must match total!</div>
-              )}
+    <div className="container mt-4">
+      <div className="card shadow-sm mx-auto" style={{ maxWidth: '600px' }}>
+        <div className="card-header bg-white py-3">
+            <h4 className="mb-0 text-center">Add Expense</h4>
+        </div>
+        <div className="card-body p-4">
+          <form onSubmit={handleSubmit}>
+            
+            {/* Description */}
+            <div className="mb-3">
+              <label className="form-label">Description</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="e.g. Dinner, Taxi"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                required
+                autoFocus
+              />
             </div>
-          )}
 
-          <button type="submit" className="btn btn-danger w-100 py-2">Save Expense</button>
-        </form>
+            {/* Amount & Payer Row */}
+            <div className="row g-3 mb-3">
+                <div className="col-md-6">
+                    <label className="form-label">Amount</label>
+                    <div className="input-group">
+                        <span className="input-group-text">₹</span>
+                        <input 
+                            type="number" 
+                            className="form-control" 
+                            placeholder="0.00"
+                            value={formData.amount}
+                            onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                            required
+                        />
+                    </div>
+                </div>
+                <div className="col-md-6">
+                    <label className="form-label">Paid By</label>
+                    <select 
+                        className="form-select"
+                        value={formData.paidByUserId}
+                        onChange={(e) => setFormData({...formData, paidByUserId: e.target.value})}
+                    >
+                        {members.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Split Type Toggle */}
+            <div className="mb-3">
+                <label className="form-label d-block">Split Method</label>
+                <div className="btn-group w-100" role="group">
+                    <input 
+                        type="radio" 
+                        className="btn-check" 
+                        name="splitType" 
+                        id="equal" 
+                        checked={formData.splitType === 'EQUAL'}
+                        onChange={() => setFormData({...formData, splitType: 'EQUAL'})}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="equal">Equally</label>
+
+                    <input 
+                        type="radio" 
+                        className="btn-check" 
+                        name="splitType" 
+                        id="exact" 
+                        checked={formData.splitType === 'EXACT'}
+                        onChange={() => setFormData({...formData, splitType: 'EXACT'})}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="exact">Exact Amounts</label>
+                </div>
+            </div>
+
+            {/* --- EQUAL SPLIT INFO --- */}
+            {formData.splitType === 'EQUAL' && (
+                <div className="alert alert-info py-2 small text-center">
+                    Each person owes <strong>₹{(getTotalAmount() / members.length || 0).toFixed(2)}</strong>
+                </div>
+            )}
+
+            {/* --- EXACT SPLIT INPUTS --- */}
+            {formData.splitType === 'EXACT' && (
+                <div className="card bg-light border-0 mb-3">
+                    <div className="card-body">
+                        <div className="d-flex justify-content-between mb-2 small fw-bold">
+                            <span>Specify shares:</span>
+                            <span className={getRemaining() === 0 ? 'text-success' : 'text-danger'}>
+                                Remaining: ₹{getRemaining().toFixed(2)}
+                            </span>
+                        </div>
+                        
+                        {members.map(member => (
+                            <div key={member.id} className="d-flex align-items-center mb-2">
+                                <label className="flex-grow-1 mb-0 text-truncate pe-2">{member.name}</label>
+                                <div className="input-group input-group-sm" style={{width: '140px'}}>
+                                    <span className="input-group-text">₹</span>
+                                    <input 
+                                        type="number" 
+                                        className="form-control"
+                                        placeholder="0"
+                                        value={exactAmounts[member.id]}
+                                        onChange={(e) => handleExactAmountChange(member.id, e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="d-grid gap-2 mt-4">
+                <button type="submit" className="btn btn-danger">Save Expense</button>
+                <button type="button" className="btn btn-light text-muted" onClick={() => navigate(`/groups/${groupId}`)}>
+                    Cancel
+                </button>
+            </div>
+
+          </form>
+        </div>
       </div>
     </div>
   );

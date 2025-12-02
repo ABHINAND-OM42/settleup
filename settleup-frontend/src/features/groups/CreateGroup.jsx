@@ -72,9 +72,10 @@ const CreateGroup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation: Admin + at least 1 friend = 2 members minimum
-    if (selectedUsers.length < 2) {
-      toast.error("Please add at least one friend to the group!");
+    // UPDATED VALIDATION: Allow group of 1 (Just Admin)
+    // We only check if the list is empty (which shouldn't happen logic-wise)
+    if (selectedUsers.length === 0) {
+      toast.error("Error: You must be part of the group.");
       return;
     }
 
@@ -131,7 +132,7 @@ const CreateGroup = () => {
 
           {/* Description Input */}
           <div className="mb-3">
-            <label className="form-label">Description</label>
+            <label className="form-label">Description (Optional)</label>
             <input 
               type="text" 
               className="form-control" 
@@ -145,7 +146,7 @@ const CreateGroup = () => {
 
           {/* User Search Input */}
           <div className="mb-3">
-            <label className="form-label fw-bold">Add Members</label>
+            <label className="form-label fw-bold">Add Members (Optional)</label>
             <div className="position-relative">
                 <input 
                   type="text" 
@@ -172,6 +173,7 @@ const CreateGroup = () => {
                 </ul>
                 )}
             </div>
+            <div className="form-text">You can add more people later from the group page.</div>
           </div>
 
           {/* Selected Members Chips */}
