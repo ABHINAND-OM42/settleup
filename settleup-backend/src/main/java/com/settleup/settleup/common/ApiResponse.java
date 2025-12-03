@@ -1,4 +1,4 @@
-package com.settleup.settleup.shared;
+package com.settleup.settleup.common;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;

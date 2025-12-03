@@ -1,4 +1,4 @@
-package com.settleup.settleup.shared;
+package com.settleup.settleup.common;
 
 import com.settleup.settleup.exception.InvalidInputException;
 import com.settleup.settleup.exception.ResourceNotFoundException;
@@ -15,7 +15,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 1. Validation Failed (@Valid) -> 400 Bad Request
+    // 1. Validation Failed
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
@@ -25,19 +25,19 @@ public class GlobalExceptionHandler {
         return buildResponse("Validation Failed", errors, HttpStatus.BAD_REQUEST);
     }
 
-    // 2. Custom Input Error (Duplicate Email/Mobile) -> 400 Bad Request
+    // 2. Custom Input Error
     @ExceptionHandler(InvalidInputException.class)
     public ResponseEntity<ApiResponse<Object>> handleInvalidInput(InvalidInputException ex) {
         return buildResponse(ex.getMessage(), null, HttpStatus.BAD_REQUEST);
     }
 
-    // 3. Not Found (Wrong Login) -> 404 Not Found
+    // 3. Not Found
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleResourceNotFound(ResourceNotFoundException ex) {
         return buildResponse(ex.getMessage(), null, HttpStatus.NOT_FOUND);
     }
 
-    // 4. Server Crash -> 500
+    // 4. Server Crash
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGlobalException(Exception ex) {
         ex.printStackTrace(); // Log error

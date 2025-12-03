@@ -11,7 +11,7 @@ public class ExpenseResponseDto {
     private Long id;
     private String description;
     private Double amount;
-    private String paidByUserName; // We just need the name for the UI
+    private String paidByUserName;
     private LocalDateTime createdAt;
     private String type;
 
@@ -22,5 +22,5 @@ public class ExpenseResponseDto {
     public static class SplitDetail {
         private String userName;
         private Double amountOwed;
-    }// "EXPENSE" or "SETTLEMENT"
+    }
 }

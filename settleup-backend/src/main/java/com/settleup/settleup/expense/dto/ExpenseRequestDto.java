@@ -24,9 +24,7 @@ public class ExpenseRequestDto {
     @NotNull(message = "Split type is required (EQUAL or EXACT)")
     private String splitType;
 
-    // For EQUAL split: List of User IDs involved [1, 2, 3]
     private List<Long> involvedUserIds;
 
-    // For EXACT split: Map of UserID -> Amount { 1: 200.0, 2: 300.0 }
     private Map<Long, Double> exactSplits;
 }

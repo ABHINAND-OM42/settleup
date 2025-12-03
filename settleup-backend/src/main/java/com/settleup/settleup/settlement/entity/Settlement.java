@@ -25,11 +25,11 @@ public class Settlement {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payer_id", nullable = false)
-    private User payer; // The person GIVING money
+    private User payer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payee_id", nullable = false)
-    private User payee; // The person RECEIVING money
+    private User payee;
 
     @Column(nullable = false)
     private Double amount;

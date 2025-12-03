@@ -10,7 +10,7 @@ import com.settleup.settleup.user.dto.UserUpdateDto;
 import com.settleup.settleup.user.entity.User;
 import com.settleup.settleup.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // Import this
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,13 +22,11 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    // We make it 'final' so it's immutable, but initialized immediately so Lombok ignores it in constructor
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     // REGISTER USER
     public UserResponseDto registerUser(UserRegisterDto dto) {
 
-        // 1. Check Duplicates
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new InvalidInputException("User with this email already exists");
         }
@@ -36,7 +34,6 @@ public class UserService {
             throw new InvalidInputException("User with this mobile number already exists");
         }
 
-        // 2. Encrypt Password & Save
         User user = User.builder()
                 .name(dto.getName())
                 .email(dto.getEmail())
@@ -49,13 +46,10 @@ public class UserService {
         return mapToResponse(savedUser);
     }
 
-    // LOGIN USER
     public UserResponseDto login(UserLoginDto dto) {
-        // 1. Find User
         User user = userRepository.findByEmailOrMobileNumber(dto.getIdentifier(), dto.getIdentifier())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with identifier: " + dto.getIdentifier()));
 
-        // 2. Check Password (Raw vs Hash)
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
             throw new InvalidInputException("Invalid password");
         }
@@ -63,12 +57,9 @@ public class UserService {
         return mapToResponse(user);
     }
 
-
-
     public List<UserResponseDto> searchUsers(String query) {
         List<User> users;
 
-        // If query is empty/null, find ALL. Else, search by name/mobile.
         if (query == null || query.isBlank()) {
             users = userRepository.findAll();
         } else {
@@ -91,17 +82,14 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // 1. Check if new Email is taken by someone else
         if (!user.getEmail().equals(dto.getEmail()) && userRepository.existsByEmail(dto.getEmail())) {
             throw new InvalidInputException("Email already in use by another account");
         }
 
-        // 2. Check if new Mobile is taken by someone else
         if (!user.getMobileNumber().equals(dto.getMobileNumber()) && userRepository.existsByMobileNumber(dto.getMobileNumber())) {
             throw new InvalidInputException("Mobile number already in use by another account");
         }
 
-        // 3. Update fields
         user.setName(dto.getName());
         user.setEmail(dto.getEmail());
         user.setMobileNumber(dto.getMobileNumber());
@@ -120,22 +108,16 @@ public class UserService {
         );
     }
 
-    // UPDATED FORGOT PASSWORD LOGIC
     public void resetPassword(PasswordResetDto dto) {
-        // 1. Validate Passwords Match
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
             throw new InvalidInputException("New Password and Confirm Password do not match.");
         }
 
-        // 2. Verify Identity
         User user = userRepository.findByEmailAndMobileNumber(dto.getEmail(), dto.getMobileNumber())
                 .orElseThrow(() -> new InvalidInputException("No account found with this Email and Mobile number."));
 
-        // 3. Update Password
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
 
         userRepository.save(user);
     }
-
-
 }

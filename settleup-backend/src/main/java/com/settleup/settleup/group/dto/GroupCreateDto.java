@@ -17,8 +17,6 @@ public class GroupCreateDto {
     @NotEmpty(message = "Group must have at least one member")
     private List<Long> memberIds;
 
-
-    // --- MAKE SURE THIS IS HERE ---
     @NotNull(message = "Creator ID is required")
     private Long createdByUserId;
 }

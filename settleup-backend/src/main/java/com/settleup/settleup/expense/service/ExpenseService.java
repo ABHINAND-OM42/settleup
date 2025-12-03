@@ -1,5 +1,7 @@
 package com.settleup.settleup.expense.service;
 
+import com.settleup.settleup.exception.InvalidInputException;
+import com.settleup.settleup.exception.ResourceNotFoundException;
 import com.settleup.settleup.expense.dto.BalanceSheetDto;
 import com.settleup.settleup.expense.dto.ExpenseRequestDto;
 import com.settleup.settleup.expense.dto.ExpenseResponseDto;
@@ -13,14 +15,17 @@ import com.settleup.settleup.settlement.entity.Settlement;
 import com.settleup.settleup.settlement.repository.SettlementRepository;
 import com.settleup.settleup.user.entity.User;
 import com.settleup.settleup.user.repository.UserRepository;
-import com.settleup.settleup.exception.InvalidInputException;
-import com.settleup.settleup.exception.ResourceNotFoundException;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,11 +36,9 @@ public class ExpenseService {
     private final ExpenseSplitRepository splitRepo;
     private final GroupRepository groupRepo;
     private final UserRepository userRepo;
-    private final SettlementRepository settlementRepo; // Inject Settlement Repo
+    private final SettlementRepository settlementRepo;
 
-    // -------------------------------------------------------------------------
-    // 1. ADD EXPENSE LOGIC
-    // -------------------------------------------------------------------------
+
     @Transactional
     public void addExpense(ExpenseRequestDto dto) {
 
@@ -45,7 +48,6 @@ public class ExpenseService {
         User payer = userRepo.findById(dto.getPaidByUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payer not found"));
 
-        // Validate Members
         Set<Long> involvedUserIds = new HashSet<>();
         involvedUserIds.add(dto.getPaidByUserId());
 
@@ -56,7 +58,6 @@ public class ExpenseService {
         }
         validateMembersBelongToGroup(group, involvedUserIds);
 
-        // Save Header
         Expense expense = Expense.builder()
                 .group(group)
                 .paidBy(payer)
@@ -67,7 +68,6 @@ public class ExpenseService {
 
         expense = expenseRepo.save(expense);
 
-        // Save Splits
         List<ExpenseSplit> splits = new ArrayList<>();
         if ("EQUAL".equalsIgnoreCase(dto.getSplitType())) {
             splits = calculateEqualSplits(expense, dto.getInvolvedUserIds(), dto.getAmount());
@@ -79,38 +79,26 @@ public class ExpenseService {
         splitRepo.saveAll(splits);
     }
 
-    // -------------------------------------------------------------------------
-    // 2. GET BALANCES LOGIC (The Fix)
-    // -------------------------------------------------------------------------
     public BalanceSheetDto getGroupBalances(Long groupId) {
 
-        // Map: UserId -> Net Balance (Positive = Owed, Negative = Owes)
         Map<Long, Double> balances = new HashMap<>();
 
-        // A. Process Expenses (Debt Creation)
         List<Expense> expenses = expenseRepo.findByGroupId(groupId);
         for (Expense e : expenses) {
-            // Payer gets POSITIVE credit
             balances.merge(e.getPaidBy().getId(), e.getAmount(), Double::sum);
 
-            // Splitters get NEGATIVE debit
             List<ExpenseSplit> splits = splitRepo.findByExpenseId(e.getId());
             for (ExpenseSplit split : splits) {
                 balances.merge(split.getUser().getId(), -split.getAmountOwed(), Double::sum);
             }
         }
 
-        // B. Process Settlements (Debt Reduction)
         List<Settlement> settlements = settlementRepo.findByGroupId(groupId);
         for (Settlement s : settlements) {
-            // Payer (Who owed money) paid back -> Balance Increases (Less Negative)
             balances.merge(s.getPayer().getId(), s.getAmount(), Double::sum);
-
-            // Payee (Who was owed) received money -> Balance Decreases (Less Positive)
             balances.merge(s.getPayee().getId(), -s.getAmount(), Double::sum);
         }
 
-        // C. Separate into Debtors and Creditors for Simplification
         List<BalanceSheetDto.UserBalance> userBalances = new ArrayList<>();
         Map<Long, Double> debtors = new HashMap<>();
         Map<Long, Double> creditors = new HashMap<>();
@@ -118,31 +106,23 @@ public class ExpenseService {
         for (Map.Entry<Long, Double> entry : balances.entrySet()) {
             double val = Math.round(entry.getValue() * 100.0) / 100.0;
 
-            // Skip if balance is essentially zero
             if (Math.abs(val) < 0.01) continue;
 
-            // Add to the View List
             User user = userRepo.findById(entry.getKey()).orElse(null);
             if (user != null) {
                 userBalances.add(new BalanceSheetDto.UserBalance(user.getId(), user.getName(), val));
             }
 
-            // Add to Calculation Maps
             if (val < 0) debtors.put(entry.getKey(), val);
             else creditors.put(entry.getKey(), val);
         }
 
-        // D. Run Algorithm
         List<BalanceSheetDto.SimplifiedDebt> simplifiedDebts = simplifyDebts(debtors, creditors);
 
         return new BalanceSheetDto(userBalances, simplifiedDebts);
     }
 
-    // -------------------------------------------------------------------------
-    // 3. PRIVATE HELPERS
-    // -------------------------------------------------------------------------
 
-    // Greedy Algorithm to minimize transactions
     private List<BalanceSheetDto.SimplifiedDebt> simplifyDebts(Map<Long, Double> debtors, Map<Long, Double> creditors) {
         List<BalanceSheetDto.SimplifiedDebt> transactions = new ArrayList<>();
 
@@ -156,7 +136,6 @@ public class ExpenseService {
             double debt = Math.abs(currentDebtor.getValue());
             double credit = currentCreditor.getValue();
 
-            // Allow settlement of the minimum of the two amounts
             double amount = Math.min(debt, credit);
             amount = Math.round(amount * 100.0) / 100.0;
 
@@ -167,11 +146,9 @@ public class ExpenseService {
                 transactions.add(new BalanceSheetDto.SimplifiedDebt(fromName, toName, amount));
             }
 
-            // Update remaining amounts
             double remainingDebt = debt - amount;
             double remainingCredit = credit - amount;
 
-            // Move pointers or update values
             if (remainingDebt < 0.01) {
                 currentDebtor = debtorIt.hasNext() ? debtorIt.next() : null;
             } else {
@@ -233,11 +210,9 @@ public class ExpenseService {
     public List<ExpenseResponseDto> getGroupHistory(Long groupId) {
         List<ExpenseResponseDto> history = new ArrayList<>();
 
-        // 1. Fetch Expenses
         List<Expense> expenses = expenseRepo.findByGroupId(groupId);
         for (Expense e : expenses) {
 
-            // --- NEW: Fetch Splits for this expense ---
             List<ExpenseSplit> splitsEntities = splitRepo.findByExpenseId(e.getId());
             List<ExpenseResponseDto.SplitDetail> splitDetails = splitsEntities.stream()
                     .map(s -> ExpenseResponseDto.SplitDetail.builder()
@@ -245,7 +220,6 @@ public class ExpenseService {
                             .amountOwed(s.getAmountOwed())
                             .build())
                     .collect(Collectors.toList());
-            // ------------------------------------------
 
             history.add(ExpenseResponseDto.builder()
                     .id(e.getId())
@@ -258,7 +232,6 @@ public class ExpenseService {
                     .build());
         }
 
-        // 2. Fetch Settlements (No changes needed here usually, but let's be consistent)
         List<Settlement> settlements = settlementRepo.findByGroupId(groupId);
         for (Settlement s : settlements) {
             String desc = s.getPayer().getName() + " paid " + s.getPayee().getName();
@@ -269,7 +242,6 @@ public class ExpenseService {
                     .paidByUserName(s.getPayer().getName())
                     .createdAt(s.getCreatedAt())
                     .type("SETTLEMENT")
-                    // Settlements don't really have "splits", but we can leave it null or empty
                     .build());
         }
 

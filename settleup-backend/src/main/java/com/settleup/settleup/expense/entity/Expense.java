@@ -2,8 +2,21 @@ package com.settleup.settleup.expense.entity;
 
 import com.settleup.settleup.group.entity.Group;
 import com.settleup.settleup.user.entity.User;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,7 +38,7 @@ public class Expense {
     @Column(nullable = false)
     private Double amount;
 
-    @Column(nullable = false) // 'EQUAL' or 'EXACT'
+    @Column(nullable = false)
     private String splitType;
 
     @Builder.Default

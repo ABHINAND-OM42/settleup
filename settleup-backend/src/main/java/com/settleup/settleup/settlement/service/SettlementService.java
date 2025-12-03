@@ -20,7 +20,6 @@ public class SettlementService {
     private final UserRepository userRepository;
 
     public void addSettlement(SettlementDto dto) {
-        // 1. Validate existence
         Group group = groupRepository.findById(dto.getGroupId())
                 .orElseThrow(() -> new ResourceNotFoundException("Group not found"));
         User payer = userRepository.findById(dto.getPayerId())

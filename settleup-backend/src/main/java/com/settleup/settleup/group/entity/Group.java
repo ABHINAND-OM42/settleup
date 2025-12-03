@@ -9,7 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "expense_groups") // 'groups' is a reserved SQL keyword
+@Table(name = "expense_groups")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -29,7 +29,6 @@ public class Group {
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // RELATIONSHIP: Group has many Members
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "group_members",
@@ -38,9 +37,6 @@ public class Group {
     )
     private Set<User> members = new HashSet<>();
 
-    // ... existing imports
-
-    // ADD THIS FIELD
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id") // New Column
     private User createdBy;

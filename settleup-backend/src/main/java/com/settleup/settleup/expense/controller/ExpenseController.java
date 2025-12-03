@@ -4,7 +4,7 @@ import com.settleup.settleup.expense.dto.BalanceSheetDto; // Make sure this impo
 import com.settleup.settleup.expense.dto.ExpenseRequestDto;
 import com.settleup.settleup.expense.dto.ExpenseResponseDto;
 import com.settleup.settleup.expense.service.ExpenseService;
-import com.settleup.settleup.shared.ApiResponse;
+import com.settleup.settleup.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,15 +20,12 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
 
-    // 1. Add Expense
     @PostMapping
     public ResponseEntity<ApiResponse<Void>> addExpense(@Valid @RequestBody ExpenseRequestDto dto) {
         expenseService.addExpense(dto);
         return ResponseEntity.ok(ApiResponse.success(null, "Expense added successfully"));
     }
 
-    // 2. Get Balances (The Dashboard API)
-    // URL: GET /api/expenses/group/{groupId}/balances
     @GetMapping("/group/{groupId}/balances")
     public ResponseEntity<ApiResponse<BalanceSheetDto>> getGroupBalances(@PathVariable Long groupId) {
         BalanceSheetDto response = expenseService.getGroupBalances(groupId);

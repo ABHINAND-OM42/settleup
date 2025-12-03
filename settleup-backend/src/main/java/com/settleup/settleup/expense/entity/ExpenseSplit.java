@@ -26,5 +26,5 @@ public class ExpenseSplit {
     private User user;
 
     @Column(nullable = false)
-    private Double amountOwed; // How much THIS user owes for this expense
+    private Double amountOwed;
 }

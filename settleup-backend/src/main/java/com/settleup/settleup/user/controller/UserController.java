@@ -6,7 +6,7 @@ import com.settleup.settleup.user.dto.UserLoginDto;
 import com.settleup.settleup.user.dto.UserResponseDto;
 import com.settleup.settleup.user.dto.UserUpdateDto;
 import com.settleup.settleup.user.service.UserService;
-import com.settleup.settleup.shared.ApiResponse;
+import com.settleup.settleup.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

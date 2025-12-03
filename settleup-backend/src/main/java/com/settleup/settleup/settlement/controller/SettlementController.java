@@ -2,7 +2,7 @@ package com.settleup.settleup.settlement.controller;
 
 import com.settleup.settleup.settlement.dto.SettlementDto;
 import com.settleup.settleup.settlement.service.SettlementService;
-import com.settleup.settleup.shared.ApiResponse;
+import com.settleup.settleup.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
