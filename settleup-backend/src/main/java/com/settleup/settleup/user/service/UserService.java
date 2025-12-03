@@ -11,6 +11,7 @@ import com.settleup.settleup.user.entity.User;
 import com.settleup.settleup.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,7 +23,9 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
+
+//    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     // REGISTER USER
     public UserResponseDto registerUser(UserRegisterDto dto) {
@@ -38,7 +41,7 @@ public class UserService {
                 .name(dto.getName())
                 .email(dto.getEmail())
                 .mobileNumber(dto.getMobileNumber())
-                .password(passwordEncoder.encode(dto.getPassword())) // <--- Hashing here
+                .password(passwordEncoder.encode(dto.getPassword()))
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -71,12 +74,12 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    public java.util.List<UserResponseDto> getAllUsers() {
-        return userRepository.findAll()
-                .stream()
-                .map(this::mapToResponse)
-                .collect(java.util.stream.Collectors.toList());
-    }
+//    public java.util.List<UserResponseDto> getAllUsers() {
+//        return userRepository.findAll()
+//                .stream()
+//                .map(this::mapToResponse)
+//                .collect(java.util.stream.Collectors.toList());
+//    }
 
     public UserResponseDto updateUser(Long userId, UserUpdateDto dto) {
         User user = userRepository.findById(userId)
@@ -99,15 +102,6 @@ public class UserService {
         return mapToResponse(updatedUser);
     }
 
-    private UserResponseDto mapToResponse(User user) {
-        return new UserResponseDto(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getMobileNumber()
-        );
-    }
-
     public void resetPassword(PasswordResetDto dto) {
         if (!dto.getNewPassword().equals(dto.getConfirmPassword())) {
             throw new InvalidInputException("New Password and Confirm Password do not match.");
@@ -119,5 +113,14 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
 
         userRepository.save(user);
+    }
+
+    private UserResponseDto mapToResponse(User user) {
+        return new UserResponseDto(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getMobileNumber()
+        );
     }
 }
