@@ -1,6 +1,6 @@
 # SettleUp - Expense Splitting Application 💰
 
-**SettleUp** is a full-stack web application designed to help friends and roommates split expenses easily.It allows users to create groups, add expenses (supports Equal and Exact splitting), tracking debts, and settle balances efficiently.
+**SettleUp** is a full-stack web application designed to help people split expenses easily.It allows users to create groups, add expenses (supports Equal and Exact splitting), track debts, and settle balances efficiently.
 
 ---
 
