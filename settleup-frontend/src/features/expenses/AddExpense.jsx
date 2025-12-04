@@ -198,13 +198,6 @@ const AddExpense = () => {
                 </div>
             </div>
 
-            {/* --- EQUAL SPLIT INFO --- */}
-            {formData.splitType === 'EQUAL' && (
-                <div className="alert alert-info py-2 small text-center">
-                    Each person owes <strong>₹{(getTotalAmount() / members.length || 0).toFixed(2)}</strong>
-                </div>
-            )}
-
             {/* --- EXACT SPLIT INPUTS --- */}
             {formData.splitType === 'EXACT' && (
                 <div className="card bg-light border-0 mb-3">

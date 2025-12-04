@@ -30,7 +30,6 @@ const Settlement = () => {
       const mems = groupRes.data.data.members;
       setMembers(mems);
 
-      // 2. Get Balances (Need "Who owes Whom")
       const balanceRes = await api.get(`/expenses/group/${groupId}/balances`);
       setDebts(balanceRes.data.data.simplifiedDebts);
     } catch (error) {
@@ -45,8 +44,7 @@ const Settlement = () => {
     if (!currentUser || members.length === 0) return [];
 
     if (mode === 'PAY') {
-      // Find debts where "fromUser" is ME
-      // Note: API returns Names. We match names to find the 'toUser' (Creditor)
+
       const myDebts = debts.filter(d => d.fromUser === currentUser.name);
       
       // Return the 'toUser' (The person I owe) as options
