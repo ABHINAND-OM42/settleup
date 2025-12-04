@@ -10,7 +10,6 @@ import com.settleup.settleup.user.dto.UserUpdateDto;
 import com.settleup.settleup.user.entity.User;
 import com.settleup.settleup.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -24,8 +23,6 @@ public class UserService {
     private final UserRepository userRepository;
 
     private final PasswordEncoder passwordEncoder;
-
-//    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     // REGISTER USER
     public UserResponseDto registerUser(UserRegisterDto dto) {
@@ -73,13 +70,6 @@ public class UserService {
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
-
-//    public java.util.List<UserResponseDto> getAllUsers() {
-//        return userRepository.findAll()
-//                .stream()
-//                .map(this::mapToResponse)
-//                .collect(java.util.stream.Collectors.toList());
-//    }
 
     public UserResponseDto updateUser(Long userId, UserUpdateDto dto) {
         User user = userRepository.findById(userId)

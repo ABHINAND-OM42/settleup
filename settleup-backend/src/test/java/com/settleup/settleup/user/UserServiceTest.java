@@ -21,7 +21,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -39,7 +41,7 @@ public class UserServiceTest {
     private UserService userService;
 
     @Test
-    void registerUser_Success(){
+    void registerUser_Success() {
         UserRegisterDto dto = new UserRegisterDto();
 
         dto.setName("Test User");
@@ -64,7 +66,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void registerUserDuplicateEmailThrowsException(){
+    void registerUserDuplicateEmailThrowsException() {
         UserRegisterDto dto = new UserRegisterDto();
         dto.setEmail("existin@example.com");
         when(userRepository.existsByEmail("existin@example.com")).thenReturn(true);
@@ -73,7 +75,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void registerUserDuplicateMobileThrowsException(){
+    void registerUserDuplicateMobileThrowsException() {
         UserRegisterDto dto = new UserRegisterDto();
         dto.setMobileNumber("1234567890");
         when(userRepository.existsByMobileNumber("1234567890")).thenReturn(true);
@@ -82,7 +84,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void successFullUserLogin(){
+    void successFullUserLogin() {
         String identifier = "test@example.com";
         String password = "password123";
         String encodedPassword = "encodedPassword";
@@ -96,19 +98,19 @@ public class UserServiceTest {
         userFormDb.setPassword(encodedPassword);
         userFormDb.setName("Test User");
 
-        when(userRepository.findByEmailOrMobileNumber(identifier,identifier))
+        when(userRepository.findByEmailOrMobileNumber(identifier, identifier))
                 .thenReturn(Optional.of(userFormDb));
         when(passwordEncoder.matches(password, encodedPassword)).thenReturn(true);
 
         UserResponseDto responseDto = userService.login(loginDto);
         assertNotNull(responseDto);
-        assertEquals(identifier,responseDto.getEmail());
+        assertEquals(identifier, responseDto.getEmail());
         assertEquals(1L, responseDto.getId());
         verify(userRepository).findByEmailOrMobileNumber(identifier, identifier);
     }
 
     @Test
-    void loginUserNotFoundThrowException(){
+    void loginUserNotFoundThrowException() {
         String identifier = "Test User";
         UserLoginDto dto = new UserLoginDto();
         dto.setIdentifier(identifier);
@@ -122,7 +124,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void LoginInvalidPasswordThrowException(){
+    void LoginInvalidPasswordThrowException() {
         String identifier = "test@example.com";
         String rawPassword = "wrongPassword";
         String encodedPassword = "actual_encoded_password";
@@ -148,7 +150,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void searchUsersWithQuery(){
+    void searchUsersWithQuery() {
         String query = "Alice";
         User u1 = User.builder().id(1L).name("Alice").build();
         User u2 = User.builder().id(2L).name("Alice Smith").build();
@@ -157,13 +159,13 @@ public class UserServiceTest {
                 .thenReturn(Arrays.asList(u1, u2));
         List<UserResponseDto> results = userService.searchUsers(query);
 
-        assertEquals(2,results.size());
+        assertEquals(2, results.size());
         assertEquals("Alice", results.get(0).getName());
     }
 
 
     @Test
-    void updateUserSuccess(){
+    void updateUserSuccess() {
         Long userId = 1L;
         User existingUser = new User();
         existingUser.setName("Old Name");
@@ -189,7 +191,7 @@ public class UserServiceTest {
     }
 
     @Test
-    void resetPasswordSuccess(){
+    void resetPasswordSuccess() {
 
         String email = "reset@example.com";
         String mobile = "9876543210";
@@ -212,6 +214,4 @@ public class UserServiceTest {
         userService.resetPassword(dto);
         assertEquals(encodedPass, existingUser.getPassword());
     }
-
-
 }

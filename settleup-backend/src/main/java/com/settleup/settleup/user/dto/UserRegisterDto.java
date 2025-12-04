@@ -23,5 +23,6 @@ public class UserRegisterDto {
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
+    @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-zA-Z]).*$", message = "Password must contain both letters and numbers")
     private String password;
 }
