@@ -138,7 +138,7 @@ const GroupView = () => {
         toast.error("Cannot delete group. There are unpaid debts! Settle everyone up first.");
         return;
     }
-    const confirmMsg = "⚠️ DANGER ZONE ⚠️\n\nAre you sure you want to PERMANENTLY DELETE this group?";
+    const confirmMsg = "Are you sure you want to PERMANENTLY DELETE this group?";
     if (!window.confirm(confirmMsg)) return;
 
     try {
